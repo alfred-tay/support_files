@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set up working directories
-mkdir -p ~/Bioinformatics/Script_dir
+mkdir -p ~/Bioinformatics/Scripts_dir
 cd ~/Bioinformatics
 
 # Install Miniconda
@@ -97,6 +97,7 @@ export PATH=\$PATH:~/Bioinformatics/Trimmomatic-0.39
 export PATH=\$PATH:~/Bioinformatics/shovill/bin
 export PATH=\$PATH:~/Bioinformatics/SKESA
 export PATH=\$PATH:~/Bioinformatics
+export PATH=\$PATH:~/Bioinformatics/Scripts_dir
 export PATH=\$PATH:~/Bioinformatics/bbmap
 EOF
 
