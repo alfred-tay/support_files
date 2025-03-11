@@ -77,7 +77,7 @@ echo -e '#!/bin/bash\njava -jar ~/Bioinformatics/Trimmomatic-0.39/trimmomatic-0.
 chmod +x ~/Bioinformatics/trimmomatic
 
 # Install BBMap
-wget https://telkomuniversity.dl.sourceforge.net/project/bbmap/BBMap_39.00.tar.gz
+wget https://sourceforge.net/projects/bbmap/files/BBMap_39.00.tar.gz/download -O BBMap_39.00.tar.gz
 tar -xvzf BBMap_39.00.tar.gz
 
 # Add installed tools to PATH
