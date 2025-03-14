@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set up working directories
-mkdir -p ~/Bioinformatics/Scripts_dir
+mkdir -p ~/Bioinformatics/Script_dir
 cd ~/Bioinformatics
 
 # Install Miniconda
@@ -19,9 +19,13 @@ conda install -y -c conda-forge -c bioconda -c defaults \
     quast fastp proteinortho fastqc abricate samtools blast trimal
 
 # Install additional dependencies via APT and PIP
+sudo apt update && sudo apt upgrade -y
 sudo apt install -y python-is-python3 python3-pip seqkit rename clustalo \
-                    pilon seqtk trimmomatic velvet bwa libboost-all-dev pigz snp-sites
+                    pilon seqtk trimmomatic velvet bwa libboost-all-dev pigz
 pip3 install --upgrade biopython
+
+wget http://mirrors.kernel.org/ubuntu/pool/main/libi/libidn/libidn11_1.33-2.2ubuntu2_amd64.deb
+sudo apt install ./libidn11_1.33-2.2ubuntu2_amd64.deb
 
 # Clone and install DFAST and Prodigal
 git clone https://github.com/nigyta/dfast_core.git
@@ -65,7 +69,7 @@ tar xzvf v0.4.0.tar.gz
 git clone https://github.com/ncbi/SKESA
 cd SKESA
 rm Makefile.nongs
-wget https://raw.githubusercontent.com/alfred-tay/support_files/refs/heads/main/Makefile.nongs
+wget https://github.com/alfred-tay/support_files/blob/main/Makefile.nongs
 sudo make -f Makefile.nongs BOOST_PATH=/usr
 cd ..
 
@@ -76,7 +80,7 @@ echo -e '#!/bin/bash\njava -jar ~/Bioinformatics/Trimmomatic-0.39/trimmomatic-0.
 chmod +x ~/Bioinformatics/trimmomatic
 
 # Install BBMap
-wget https://sourceforge.net/projects/bbmap/files/BBMap_39.00.tar.gz/download -O BBMap_39.00.tar.gz
+wget https://telkomuniversity.dl.sourceforge.net/project/bbmap/BBMap_39.00.tar.gz
 tar -xvzf BBMap_39.00.tar.gz
 
 # Add installed tools to PATH
@@ -97,12 +101,10 @@ export PATH=\$PATH:~/Bioinformatics/Trimmomatic-0.39
 export PATH=\$PATH:~/Bioinformatics/shovill/bin
 export PATH=\$PATH:~/Bioinformatics/SKESA
 export PATH=\$PATH:~/Bioinformatics
-export PATH=\$PATH:~/Bioinformatics/Scripts_dir
 export PATH=\$PATH:~/Bioinformatics/bbmap
 EOF
 
 # Apply changes
 source ~/.bashrc
 
-sudo apt update && sudo apt upgrade -y
 echo "Setup complete!"
