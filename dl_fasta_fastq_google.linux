@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Install required dependencies
+#pip3 install --upgrade biopython gdown
+
+# Define file IDs and corresponding output file names
+declare -A files=(
+    ["1hCeCFtEt29loduP2ia0sGGb9GPIdkwSN"]="fastq.zip"
+    ["1UtAFQIVGLhMVUIb0mzr_vxTqJHkoUYRQ"]="fasta.zip"
+)
+
+# Function to download file using gdown
+download_file() {
+    local FILE_ID=$1
+    local FILE_NAME=$2
+
+    echo "Downloading ${FILE_NAME}..."
+    gdown --id "${FILE_ID}" -O "${FILE_NAME}"
+
+    if [[ $? -eq 0 ]]; then
+        echo "Download complete: ${FILE_NAME}"
+    else
+        echo "Error downloading ${FILE_NAME}. Please check the file ID or your internet connection."
+    fi
+}
+
+# Loop through all files and download them
+for FILE_ID in "${!files[@]}"; do
+    download_file "$FILE_ID" "${files[$FILE_ID]}"
+done
