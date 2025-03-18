@@ -23,10 +23,14 @@ for FILE in *.fa; do
 done
 
 # Run abricate on each .fasta file
+COUNT_file=0
 for FILE in *.fasta; do
   BASENAME="${FILE%.fasta}"
-  abricate --db 23s_ref "$FILE" > "${BASENAME}_list"
+  abricate --db 23s_ref "$FILE" > "${BASENAME}_list" 2>/dev/null
+  ((COUNT_file++))
+  echo -ne "\rProcessed: $COUNT_file"
 done
+echo
 
 # Clean up reference database
 rm -r $REF_DB_DIR
