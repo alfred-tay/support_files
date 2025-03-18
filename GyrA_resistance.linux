@@ -1,0 +1,143 @@
+#!/bin/bash
+#this require the installation of abricate, $Install_abricate.linux
+#and samtools
+#remember to run this outside conda, $conda deactivate
+
+
+#This copy the gene list into the database
+#echo "Please enter reference genes list"
+#read Ref1
+today_date=$(date +"%d-%m-%y")
+
+#rm gyrA_ref 2> /dev/null
+wget https://raw.githubusercontent.com/alfred-tay/support_files/main/gyrA_ref
+
+mkdir ~/miniconda3/db/gyrA_ref
+cp gyrA_ref ~/miniconda3/db/gyrA_ref/sequences
+abricate --setupdb
+
+for File11 in `ls *.fa | sed 's/.fa//'`
+do
+mv ${File11}.fa ${File11}.fasta 2> /dev/null
+done
+
+for File1 in `ls -1 *.fasta | sed 's/.fasta//'`
+do
+
+abricate --db gyrA_ref ${File1}.fasta > ${File1}_list
+
+done
+
+rm -r ~/miniconda3/db/gyrA_ref
+
+
+for File2 in `ls -1 *_list | sed 's/_list//'`
+do
+
+count1=$(wc -l < ${File2}_list)
+cp ${File2}_list ${File2}_temp
+
+for ((i=1; i<count1; i++))
+do
+
+data1=$(tail -1 ${File2}_temp | awk '{print $1}') #file name
+data2=$(tail -1 ${File2}_temp | awk '{print $2}') #contig name
+data3=$(tail -1 ${File2}_temp | awk '{print $3}') #start
+data4=$(tail -1 ${File2}_temp | awk '{print $4}') #end
+data5=$(tail -1 ${File2}_temp | awk '{print $5}') #orientation
+data6=$(tail -1 ${File2}_temp | awk '{print $6}') #gene name
+
+if [ $data5 == "-" ]
+then
+samtools faidx -i ${File2}.fasta ${data2}:${data3}-${data4} > ${File2}_${data6}
+
+else
+samtools faidx ${File2}.fasta ${data2}:${data3}-${data4} > ${File2}_${data6}
+fi
+
+head -n -$i ${File2}_list > ${File2}_temp
+
+done
+done
+
+rm *_temp *.fai
+
+rm Gene_extraction_report 2> /dev/null
+for f in `ls *.fasta | sed 's/.fasta//'`
+do
+
+echo -ne $f >> Gene_extraction_report
+
+for gene1 in `more *_ref | grep ">" | sed 's/>//g'`
+do
+
+count1=$(awk '/^>/{l=0; next}{l+=length($0)}END{print l}' ${f}_${gene1})
+echo -ne '\t' $count1 >> Gene_extraction_report
+
+done
+
+echo  >> Gene_extraction_report
+
+done
+
+echo -ne "ID" '\t' >> temp
+for gene2 in `more *_ref | grep ">" | sed 's/>//g'`
+do
+
+echo -ne $gene2 '\t' >> temp
+
+done
+echo >> temp
+cat temp Gene_extraction_report > temp1
+rm Gene_extraction_report
+mv temp1 GyrA_report.csv
+rm temp
+
+for File3 in `ls *_GyrA | sed 's/_GyrA//'`
+do
+seqkit translate ${File3}_GyrA > ${File3}_GyrA.aa
+seqkit translate gyrA_ref > 26695_GyrA.aa
+done
+
+cat *.aa > GyrA_all
+clustalo -i GyrA_all -o GyrA_all.aln
+
+sed -i 's/:.*//g' GyrA_all.aln
+sed -i 's/_len=.*//g' GyrA_all.aln
+
+more GyrA_all.aln | grep ">" | sed 's/>//g' > list.temp
+
+for f1 in `more GyrA_all.aln | grep ">" | sed 's/>//g'`
+do
+samtools faidx GyrA_all.aln $f1 > ${f1}.fasta_temp
+
+done
+
+rm GyrA_AA.csv 2> /dev/null
+
+rm *_temp1
+
+seqkit locate -i -p RIVGDVIGKYHPHGDN GyrA.fasta_temp > GyrA.fasta_temp2_1 #position N87
+
+sed -i '1 d' GyrA.fasta_temp2_1
+data1=$(head -1 GyrA.fasta_temp2_1 | awk '{print $6}') 
+
+
+for f2 in `ls *.fasta_temp`
+do
+data2=$(head -1 ${f2} | sed 's/>//')
+samtools faidx $f2 $data2:$data1-$data1 > ${f2}_1
+data3=$(more ${f2}_1 | sed '1 d')
+
+rm *.fai
+data1_1=$(($data1 +4)) #position 91
+samtools faidx $f2 $data2:$data1_1-$data1_1 > ${f2}_2
+data3_1=$(more ${f2}_2 | sed '1 d')
+
+echo -ne $data2 '\t' $data3 '\t' $data3_1 '\n' >> report_temp
+
+done
+
+echo -ne "ID" '\t' "N87" '\t' "D91" '\n' > temp_heading
+cat temp_heading report_temp > GyrA_AA_${today_date}.csv
+rm *temp*

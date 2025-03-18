@@ -1,0 +1,151 @@
+#!/bin/bash
+#this require the installation of abricate, $Install_abricate.linux
+#and samtools
+#remember to run this outside conda, $conda deactivate
+
+
+#This copy the gene list into the database
+#echo "Please enter reference genes list"
+#read Ref1
+today_date=$(date +"%d-%m-%y")
+
+#rm 23s_ref 2> /dev/null
+
+wget https://raw.githubusercontent.com/alfred-tay/support_files/main/23s_ref
+mkdir ~/miniconda3/db/23s_ref
+cp 23s_ref ~/miniconda3/db/23s_ref/sequences
+abricate --setupdb
+
+for File11 in `ls *.fa | sed 's/.fa//' 2> /dev/null`
+do
+mv ${File11}.fa ${File11}.fasta 2> /dev/null
+done
+
+for File1 in `ls -1 *.fasta | sed 's/.fasta//'`
+do
+
+abricate --db 23s_ref ${File1}.fasta > ${File1}_list
+
+done
+
+rm -r ~/miniconda3/db/23s_ref
+
+
+for File2 in `ls -1 *_list | sed 's/_list//'`
+do
+
+count1=$(wc -l < ${File2}_list)
+cp ${File2}_list ${File2}_temp
+
+for ((i=1; i<count1; i++))
+do
+
+data1=$(tail -1 ${File2}_temp | awk '{print $1}') #file name
+data2=$(tail -1 ${File2}_temp | awk '{print $2}') #contig name
+data3=$(tail -1 ${File2}_temp | awk '{print $3}') #start
+data4=$(tail -1 ${File2}_temp | awk '{print $4}') #end
+data5=$(tail -1 ${File2}_temp | awk '{print $5}') #orientation
+data6=$(tail -1 ${File2}_temp | awk '{print $6}') #gene name
+
+if [ $data5 == "-" ]
+then
+samtools faidx -i ${File2}.fasta ${data2}:${data3}-${data4} > ${File2}_${data6}
+
+else
+samtools faidx ${File2}.fasta ${data2}:${data3}-${data4} > ${File2}_${data6}
+fi
+
+head -n -$i ${File2}_list > ${File2}_temp
+
+done
+done
+
+rm *_temp *.fai
+
+rm Gene_extraction_report 2> /dev/null
+for f in `ls *.fasta | sed 's/.fasta//'`
+do
+
+echo -ne $f >> Gene_extraction_report
+
+for gene1 in `more *_ref | grep ">" | sed 's/>//g'`
+do
+
+count1=$(awk '/^>/{l=0; next}{l+=length($0)}END{print l}' ${f}_${gene1})
+echo -ne '\t' $count1 >> Gene_extraction_report
+
+done
+
+echo  >> Gene_extraction_report
+
+done
+
+echo -ne "ID" '\t' >> temp
+for gene2 in `more *_ref | grep ">" | sed 's/>//g'`
+do
+
+echo -ne $gene2 '\t' >> temp
+
+done
+echo >> temp
+cat temp Gene_extraction_report > temp1
+rm Gene_extraction_report
+mv temp1 23s_report1.csv
+rm temp
+
+cat 23s_ref *_23s > 23s_all
+clustalo -i 23s_all -o 23s_all.aln
+
+sed -i 's/:.*//g' 23s_all.aln
+sed -i 's/_len=.*//g' 23s_all.aln
+
+
+for f1 in `more 23s_all.aln | grep ">" | sed 's/>//g'`
+do
+samtools faidx 23s_all.aln $f1 > ${f1}.fasta_temp
+
+done
+
+rm 23s_report.csv 2> /dev/null
+
+rm *_temp1 2> /dev/null
+
+samtools faidx 23s_all.aln 23s > 23s_temp
+
+seqkit locate -i -p CGCGGCAAGACGGA 23s_temp > 23s_ref_temp #locate position 2142
+
+sed -i '1 d' 23s_ref_temp
+data1=$(head -1 23s_ref_temp | awk '{print $6}') 
+
+for f2 in `ls *.fasta_temp`
+do
+data2=$(head -1 ${f2} | sed 's/>//') #strain ID
+samtools faidx $f2 $data2:$data1-$data1 > ${f2}_1 #position 2142 (also known as 2146)
+data3=$(more ${f2}_1 | sed '1 d')
+
+rm *.fai
+
+data1_1=$(($data1 + 1)) #position 2143 (also known as 2147)
+#data1_2=$(($data1 + 4)) #position 2146
+#data1_3=$(($data1 + 5)) #position 2147
+echo $data1
+echo $data1_1
+samtools faidx $f2 $data2:$data1_1-$data1_1 > ${f2}_2
+data3_1=$(more ${f2}_2 | sed '1 d')
+rm *.fai 2> /dev/null
+
+#samtools faidx $f2 $data2:$data1_2-$data1_2 > ${f2}_3
+#data3_2=$(more ${f2}_3 | sed '1 d')
+#rm *.fai 2> /dev/null
+
+#samtools faidx $f2 $data2:$data1_3-$data1_3 > ${f2}_4
+#data3_3=$(more ${f2}_4 | sed '1 d')
+#rm *.fai 2> /dev/null
+
+echo -ne $data2 '\t' $data3 '\t' $data3_1 '\n' >> report_temp
+
+done
+
+echo -ne "ID" '\t' "A2142 (aka 2146)" '\t' "A2143 (aka 2147)" '\n' > temp_heading
+cat temp_heading report_temp > 23s_report_${today_date}.csv
+rm *temp*
