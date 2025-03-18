@@ -35,6 +35,7 @@ echo
 rm -r $REF_DB_DIR
 
 # Process abricate output (skip empty _list files)
+echo "Processing abricate output"
 for FILE in *_list; do
   [ -s "$FILE" ] || continue  # Skip if file is empty
   BASENAME="${FILE%_list}"
@@ -84,6 +85,7 @@ cat temp Gene_extraction_report > 23s_report_presence_absence.csv
 rm -f temp Gene_extraction_report
 
 # Perform sequence alignment
+echo "Concatinating and aligning all extracted files"
 cat 23s_ref *_23s > 23s_all
 clustalo -i 23s_all -o 23s_all.aln
 sed -i 's/:.*//g; s/_len=.*//g' 23s_all.aln
@@ -96,6 +98,7 @@ done
 rm -f *.fai *_temp1
 
 # Identify mutation positions
+echo "Identifying mutation positions"
 samtools faidx 23s_all.aln 23s > 23s_temp
 seqkit locate -i -p CGCGGCAAGACGGA 23s_temp > 23s_ref_temp
 
@@ -122,4 +125,6 @@ done
   cat report_temp
 } > "23s_report_${TODAY_DATE}.csv"
 
-rm -f *temp*
+echo
+echo "Process complete"
+rm -f *temp* *.fai
