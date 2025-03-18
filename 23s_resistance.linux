@@ -41,21 +41,17 @@ for FILE in *_list; do
   for ((i=1; i<COUNT; i++)); do
     LAST_LINE=$(tail -1 "${BASENAME}_temp")
     read -r DATA1 DATA2 DATA3 DATA4 DATA5 DATA6 DATA7 <<< "$LAST_LINE"
-
-    OUTPUT_FILE="${BASENAME}_${DATA6}"
-    [ -e "$OUTPUT_FILE" ] || continue  # Skip if output file is missing
-
+read
     if [[ "$DATA5" == "-" ]]; then
-      samtools faidx -i "$BASENAME.fasta" "$DATA2:$DATA3-$DATA4" > "$OUTPUT_FILE"
+      samtools faidx -i "$BASENAME.fasta" "$DATA2:$DATA3-$DATA4" > "${BASENAME}_${DATA6}"
     else
-      samtools faidx "$BASENAME.fasta" "$DATA2:$DATA3-$DATA4" > "$OUTPUT_FILE"
+      samtools faidx "$BASENAME.fasta" "$DATA2:$DATA3-$DATA4" > "${BASENAME}_${DATA6}"
     fi
 
     head -n -$i "$FILE" > "${BASENAME}_temp"
   done
 
 done
-
 rm -f *_temp *.fai
 
 # Generate gene extraction report
