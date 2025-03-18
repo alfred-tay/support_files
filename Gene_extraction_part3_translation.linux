@@ -1,0 +1,29 @@
+  GNU nano 6.2                                                  Gene_extraction_part3_translation.linux                                                           
+#!/bin/bash
+
+# Prompt user for file extension
+read -p "Enter file extension (e.g., _CP): " EXT
+
+# Find all files with the given extension
+for FILE in *"$EXT"; do
+    if [[ -f "$FILE" ]]; then
+        # Remove the extension from the filename to avoid duplication in output
+        BASE_NAME="${FILE%"$EXT"}"
+        OUTPUT="${BASE_NAME}${EXT}.aa"
+
+        echo "Processing $FILE -> $OUTPUT"
+
+        # Translate using correct frames: 1, 2, 3, -1, -2, -3, and 6
+        seqkit translate --trim -f 1,2,3,-1,-2,-3,6 "$FILE" | \
+        seqkit fx2tab | \
+        awk -F'\t' '$2 !~ "\\*" {print $1, $2, length($2)}' | \
+        sort -k3,3nr | head -n 1 | \
+        awk '{print ">"$1"\n"$2}' > "$OUTPUT"
+
+        echo "Saved: $OUTPUT"
+    else
+        echo "Skipping: $FILE (not a file)"
+    fi
+done
+
+echo "All files processed!"

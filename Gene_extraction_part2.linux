@@ -1,0 +1,21 @@
+#!/bin/bash
+today_date=$(date +"%d-%m-%y")
+echo "After the gene extraction, this is to align and merge the genes"
+echo
+echo "Cat all the *_gene into one file, then clustalo"
+for f in `more *_ref | grep ">" | sed 's/>//g'`
+do
+
+cat *_${f} > ${f}_all
+clustalo -i ${f}_all -o ${f}_all.aln_bak
+sed 's/_.*//g' ${f}_all.aln_bak > ${f}_all.aln
+
+done
+
+echo "Concatenating the alignment files into one. joint.aln"
+seqkit concat *.aln > joint.aln
+
+cut -f1 joint.aln | awk -v RS=">" -v FS="\n" -v OFS="\n" '{for(i=2; i<=NF; i++) {seq[$1] = seq[$1]$i}}; END {for(id in seq){print ">"id, seq[id]}}' > joint_temp
+
+echo "Preparing report. joint_report.csv"
+awk 'BEGIN{FS="[> ]"} /^>/{val=$2;next} {print val,length($0)}' joint_temp | sort -nk2 > joint_report_${today_date}.csv

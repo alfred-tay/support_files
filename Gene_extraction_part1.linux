@@ -1,0 +1,98 @@
+#!/bin/bash
+today_date=$(date +"%d-%m-%y")
+echo "This script requires abricate ($Install_abricate.linux) and samtools"
+echo "Prepare a list of genes of interest in fasta format, this will be your reference file"
+echo "Run this script in a folder with all your genomes in fasta format and the reference file"
+#remember to run this outside conda, $conda deactivate
+echo
+
+#This copy the gene list into the database
+echo "Please enter the name of your reference file"
+read Ref1
+
+echo "Preparing database"
+mkdir ~/miniconda3/db/${Ref1}
+cp ${Ref1} ~/miniconda3/db/${Ref1}/sequences
+abricate --setupdb --quiet
+
+for File11 in `ls *.fa | sed 's/.fa//' 2>/dev/null`
+do
+mv ${File11}.fa ${File11}.fasta 2>/dev/null
+done
+
+echo "Locating genes coordinate. *_list"
+for File1 in `ls -1 *.fasta | sed 's/.fasta//'`
+do
+
+abricate --minid 60 --mincov 60 --quiet --db $Ref1 ${File1}.fasta > ${File1}_list
+
+done
+
+rm -r ~/miniconda3/db/${Ref1}
+
+echo "Extracting gene, *_gene"
+for File2 in `ls -1 *_list | sed 's/_list//'`
+do
+
+count1=$(wc -l < ${File2}_list)
+cp ${File2}_list ${File2}_temp
+
+for ((i=1; i<count1; i++))
+do
+
+data1=$(tail -1 ${File2}_temp | awk '{print $1}') #file name
+data2=$(tail -1 ${File2}_temp | awk '{print $2}') #contig name
+data3=$(tail -1 ${File2}_temp | awk '{print $3}') #start
+data4=$(tail -1 ${File2}_temp | awk '{print $4}') #end
+data5=$(tail -1 ${File2}_temp | awk '{print $5}') #orientation
+data6=$(tail -1 ${File2}_temp | awk '{print $6}') #gene name
+
+if [ $data5 == "-" ]
+then
+samtools faidx -i ${File2}.fasta ${data2}:${data3}-${data4} > ${File2}_${data6}
+
+else
+samtools faidx ${File2}.fasta ${data2}:${data3}-${data4} > ${File2}_${data6}
+fi
+
+sed -i 's/:.*//' ${File2}_${data6}
+head -n -$i ${File2}_list > ${File2}_temp
+
+done
+done
+
+rm *_temp *.fai
+
+echo "Preparing report. Gene_extraction_report.csv"
+rm Gene_extraction_report 2> /dev/null
+for f in `ls *.fasta | sed 's/.fasta//'`
+do
+
+echo -ne $f >> Gene_extraction_report
+
+for gene1 in `more *_ref | grep ">" | sed 's/>//g'`
+do
+
+count1=$(awk '/^>/{l=0; next}{l+=length($0)}END{print l}' ${f}_${gene1} 2> /dev/null)
+echo -ne '\t' $count1 >> Gene_extraction_report
+
+done
+
+echo  >> Gene_extraction_report
+
+done
+
+echo -ne "ID" ' \t' >> temp
+for gene2 in `cat $Ref1 | grep ">" | sed 's/>//g'`
+do
+
+echo -ne $gene2 ' \t' >> temp
+
+done
+echo >> temp
+cat temp Gene_extraction_report > temp1
+rm Gene_extraction_report
+mv temp1 Gene_extraction_report_${today_date}.csv
+rm temp
+
+#cat *_${data6} > all_${data6}
