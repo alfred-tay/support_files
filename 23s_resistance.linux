@@ -1,151 +1,126 @@
 #!/bin/bash
-#this require the installation of abricate, $Install_abricate.linux
-#and samtools
-#remember to run this outside conda, $conda deactivate
 
+set -e  # Exit on error
+set -u  # Treat unset variables as errors
 
-#This copy the gene list into the database
-#echo "Please enter reference genes list"
-#read Ref1
-today_date=$(date +"%d-%m-%y")
+# Get today's date
+TODAY_DATE=$(date +"%d-%m-%y")
 
-#rm 23s_ref 2> /dev/null
+# Download reference gene list
+REF_DB_DIR=~/miniconda3/db/23s_ref
+REF_FILE=23s_ref
 
-wget https://raw.githubusercontent.com/alfred-tay/support_files/main/23s_ref
-mkdir ~/miniconda3/db/23s_ref
-cp 23s_ref ~/miniconda3/db/23s_ref/sequences
+rm -f $REF_FILE 2> /dev/null
+wget -q https://raw.githubusercontent.com/alfred-tay/support_files/main/$REF_FILE
+mkdir -p $REF_DB_DIR
+cp $REF_FILE $REF_DB_DIR/sequences
 abricate --setupdb
 
-for File11 in `ls *.fa | sed 's/.fa//' 2> /dev/null`
-do
-mv ${File11}.fa ${File11}.fasta 2> /dev/null
+# Rename .fa files to .fasta
+for FILE in *.fa; do
+  [ -e "$FILE" ] || continue
+  mv "$FILE" "${FILE%.fa}.fasta"
 done
 
-for File1 in `ls -1 *.fasta | sed 's/.fasta//'`
-do
-
-abricate --db 23s_ref ${File1}.fasta > ${File1}_list
-
+# Run abricate on each .fasta file
+for FILE in *.fasta; do
+  BASENAME="${FILE%.fasta}"
+  abricate --db 23s_ref "$FILE" > "${BASENAME}_list"
 done
 
-rm -r ~/miniconda3/db/23s_ref
+# Clean up reference database
+rm -r $REF_DB_DIR
 
+# Process abricate output (skip empty _list files)
+for FILE in *_list; do
+  [ -s "$FILE" ] || continue  # Skip if file is empty
+  BASENAME="${FILE%_list}"
+  COUNT=$(wc -l < "$FILE")
+  cp "$FILE" "${BASENAME}_temp"
 
-for File2 in `ls -1 *_list | sed 's/_list//'`
-do
+  for ((i=1; i<COUNT; i++)); do
+    LAST_LINE=$(tail -1 "${BASENAME}_temp")
+    read -r DATA1 DATA2 DATA3 DATA4 DATA5 DATA6 DATA7 <<< "$LAST_LINE"
 
-count1=$(wc -l < ${File2}_list)
-cp ${File2}_list ${File2}_temp
+    OUTPUT_FILE="${BASENAME}_${DATA6}"
+    [ -e "$OUTPUT_FILE" ] || continue  # Skip if output file is missing
 
-for ((i=1; i<count1; i++))
-do
+    if [[ "$DATA5" == "-" ]]; then
+      samtools faidx -i "$BASENAME.fasta" "$DATA2:$DATA3-$DATA4" > "$OUTPUT_FILE"
+    else
+      samtools faidx "$BASENAME.fasta" "$DATA2:$DATA3-$DATA4" > "$OUTPUT_FILE"
+    fi
 
-data1=$(tail -1 ${File2}_temp | awk '{print $1}') #file name
-data2=$(tail -1 ${File2}_temp | awk '{print $2}') #contig name
-data3=$(tail -1 ${File2}_temp | awk '{print $3}') #start
-data4=$(tail -1 ${File2}_temp | awk '{print $4}') #end
-data5=$(tail -1 ${File2}_temp | awk '{print $5}') #orientation
-data6=$(tail -1 ${File2}_temp | awk '{print $6}') #gene name
-
-if [ $data5 == "-" ]
-then
-samtools faidx -i ${File2}.fasta ${data2}:${data3}-${data4} > ${File2}_${data6}
-
-else
-samtools faidx ${File2}.fasta ${data2}:${data3}-${data4} > ${File2}_${data6}
-fi
-
-head -n -$i ${File2}_list > ${File2}_temp
-
-done
-done
-
-rm *_temp *.fai
-
-rm Gene_extraction_report 2> /dev/null
-for f in `ls *.fasta | sed 's/.fasta//'`
-do
-
-echo -ne $f >> Gene_extraction_report
-
-for gene1 in `more *_ref | grep ">" | sed 's/>//g'`
-do
-
-count1=$(awk '/^>/{l=0; next}{l+=length($0)}END{print l}' ${f}_${gene1})
-echo -ne '\t' $count1 >> Gene_extraction_report
+    head -n -$i "$FILE" > "${BASENAME}_temp"
+  done
 
 done
 
-echo  >> Gene_extraction_report
+rm -f *_temp *.fai
+
+# Generate gene extraction report
+rm -f Gene_extraction_report
+for FILE in *.fasta; do
+  BASENAME="${FILE%.fasta}"
+  echo -ne "$BASENAME" >> Gene_extraction_report
+
+  for GENE in $(grep ">" *_ref | sed 's/>//g'); do
+    OUTPUT_FILE="${BASENAME}_${GENE}"
+    [ -e "$OUTPUT_FILE" ] || continue  # Skip if file is missing
+    COUNT=$(awk '/^>/{l=0; next}{l+=length($0)}END{print l}' "$OUTPUT_FILE")
+    echo -ne "\t$COUNT" >> Gene_extraction_report
+  done
+  echo >> Gene_extraction_report
 
 done
 
-echo -ne "ID" '\t' >> temp
-for gene2 in `more *_ref | grep ">" | sed 's/>//g'`
-do
+# Generate final report
+rm -f temp
+{
+  echo -ne "ID\t"
+  grep ">" *_ref | sed 's/>//g' | tr '\n' '\t'
+  echo
+} > temp
+cat temp Gene_extraction_report > 23s_report_presence_absence.csv
+rm -f temp Gene_extraction_report
 
-echo -ne $gene2 '\t' >> temp
-
-done
-echo >> temp
-cat temp Gene_extraction_report > temp1
-rm Gene_extraction_report
-mv temp1 23s_report1.csv
-rm temp
-
+# Perform sequence alignment
 cat 23s_ref *_23s > 23s_all
 clustalo -i 23s_all -o 23s_all.aln
+sed -i 's/:.*//g; s/_len=.*//g' 23s_all.aln
 
-sed -i 's/:.*//g' 23s_all.aln
-sed -i 's/_len=.*//g' 23s_all.aln
-
-
-for f1 in `more 23s_all.aln | grep ">" | sed 's/>//g'`
-do
-samtools faidx 23s_all.aln $f1 > ${f1}.fasta_temp
-
+# Extract sequence data
+for FILE in $(grep ">" 23s_all.aln | sed 's/>//g'); do
+  samtools faidx 23s_all.aln "$FILE" > "${FILE}.fasta_temp"
 done
 
-rm 23s_report.csv 2> /dev/null
+rm -f *.fai *_temp1
 
-rm *_temp1 2> /dev/null
-
+# Identify mutation positions
 samtools faidx 23s_all.aln 23s > 23s_temp
+seqkit locate -i -p CGCGGCAAGACGGA 23s_temp > 23s_ref_temp
 
-seqkit locate -i -p CGCGGCAAGACGGA 23s_temp > 23s_ref_temp #locate position 2142
+sed -i '1d' 23s_ref_temp
+POSITION=$(awk 'NR==1 {print $6}' 23s_ref_temp)
+NEXT_POSITION=$((POSITION + 1))
 
-sed -i '1 d' 23s_ref_temp
-data1=$(head -1 23s_ref_temp | awk '{print $6}') 
+rm -f report_temp
+for FILE in *.fasta_temp; do
+  STRAIN_ID=$(head -1 "$FILE" | sed 's/>//')
+  samtools faidx "$FILE" "$STRAIN_ID:$POSITION-$POSITION" > "${FILE}_1"
+  DATA1=$(sed '1d' "${FILE}_1")
+  
+  samtools faidx "$FILE" "$STRAIN_ID:$NEXT_POSITION-$NEXT_POSITION" > "${FILE}_2"
+  DATA2=$(sed '1d' "${FILE}_2")
 
-for f2 in `ls *.fasta_temp`
-do
-data2=$(head -1 ${f2} | sed 's/>//') #strain ID
-samtools faidx $f2 $data2:$data1-$data1 > ${f2}_1 #position 2142 (also known as 2146)
-data3=$(more ${f2}_1 | sed '1 d')
-
-rm *.fai
-
-data1_1=$(($data1 + 1)) #position 2143 (also known as 2147)
-#data1_2=$(($data1 + 4)) #position 2146
-#data1_3=$(($data1 + 5)) #position 2147
-echo $data1
-echo $data1_1
-samtools faidx $f2 $data2:$data1_1-$data1_1 > ${f2}_2
-data3_1=$(more ${f2}_2 | sed '1 d')
-rm *.fai 2> /dev/null
-
-#samtools faidx $f2 $data2:$data1_2-$data1_2 > ${f2}_3
-#data3_2=$(more ${f2}_3 | sed '1 d')
-#rm *.fai 2> /dev/null
-
-#samtools faidx $f2 $data2:$data1_3-$data1_3 > ${f2}_4
-#data3_3=$(more ${f2}_4 | sed '1 d')
-#rm *.fai 2> /dev/null
-
-echo -ne $data2 '\t' $data3 '\t' $data3_1 '\n' >> report_temp
+  echo -ne "$STRAIN_ID\t$DATA1\t$DATA2\n" >> report_temp
 
 done
 
-echo -ne "ID" '\t' "A2142 (aka 2146)" '\t' "A2143 (aka 2147)" '\n' > temp_heading
-cat temp_heading report_temp > 23s_report_${today_date}.csv
-rm *temp*
+# Finalize mutation report
+{
+  echo -ne "ID\tA2142 (aka 2146)\tA2143 (aka 2147)\n"
+  cat report_temp
+} > "23s_report_${TODAY_DATE}.csv"
+
+rm -f *temp*
