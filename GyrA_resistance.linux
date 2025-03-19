@@ -1,143 +1,127 @@
 #!/bin/bash
-#this require the installation of abricate, $Install_abricate.linux
-#and samtools
-#remember to run this outside conda, $conda deactivate
 
-
-#This copy the gene list into the database
-#echo "Please enter reference genes list"
-#read Ref1
+# Get today's date
 today_date=$(date +"%d-%m-%y")
 
-#rm gyrA_ref 2> /dev/null
-wget https://raw.githubusercontent.com/alfred-tay/support_files/main/gyrA_ref
+# Download reference file
+wget -q https://raw.githubusercontent.com/alfred-tay/support_files/main/gyrA_ref
 
-mkdir ~/miniconda3/db/gyrA_ref
-cp gyrA_ref ~/miniconda3/db/gyrA_ref/sequences
+# Setup database
+db_dir=~/miniconda3/db/gyrA_ref
+mkdir -p $db_dir
+cp gyrA_ref $db_dir/sequences
 abricate --setupdb
 
-for File11 in `ls *.fa | sed 's/.fa//'`
-do
-mv ${File11}.fa ${File11}.fasta 2> /dev/null
+# Rename .fa files to .fasta
+for file in *.fa; do
+    mv "$file" "${file%.fa}.fasta" 2>/dev/null
 done
 
-for File1 in `ls -1 *.fasta | sed 's/.fasta//'`
-do
+# Run Abricate on all .fasta files
+COUNT_file=0
+for FILE in *.fasta; do
+  BASENAME="${FILE%.fasta}"
+  abricate --db gyrA_ref "$FILE" > "${BASENAME}_list" 2>/dev/null
+  ((COUNT_file++))
+  echo -ne "\rProcessed: $COUNT_file"
+done
+echo
 
-abricate --db gyrA_ref ${File1}.fasta > ${File1}_list
+# Clean up database
+rm -r $db_dir
+
+# Extract gene sequences from Abricate output
+for file in *_list; do
+    base_name="${file%_list}"
+    count=$(wc -l < "$file")
+    cp "$file" "${base_name}_temp"
+    
+    for ((i = 1; i < count; i++)); do
+        read -r data1 data2 data3 data4 data5 data6 data7 < <(tail -1 "${base_name}_temp")
+        
+        if [[ "$data5" == "-" ]]; then
+            samtools faidx -i "${base_name}.fasta" "$data2:$data3-$data4" > "${base_name}_$data6"
+        else
+            samtools faidx "${base_name}.fasta" "$data2:$data3-$data4" > "${base_name}_$data6"
+        fi
+        
+        head -n -$i "$file" > "${base_name}_temp"
+    done
 
 done
 
-rm -r ~/miniconda3/db/gyrA_ref
-
-
-for File2 in `ls -1 *_list | sed 's/_list//'`
-do
-
-count1=$(wc -l < ${File2}_list)
-cp ${File2}_list ${File2}_temp
-
-for ((i=1; i<count1; i++))
-do
-
-data1=$(tail -1 ${File2}_temp | awk '{print $1}') #file name
-data2=$(tail -1 ${File2}_temp | awk '{print $2}') #contig name
-data3=$(tail -1 ${File2}_temp | awk '{print $3}') #start
-data4=$(tail -1 ${File2}_temp | awk '{print $4}') #end
-data5=$(tail -1 ${File2}_temp | awk '{print $5}') #orientation
-data6=$(tail -1 ${File2}_temp | awk '{print $6}') #gene name
-
-if [ $data5 == "-" ]
-then
-samtools faidx -i ${File2}.fasta ${data2}:${data3}-${data4} > ${File2}_${data6}
-
-else
-samtools faidx ${File2}.fasta ${data2}:${data3}-${data4} > ${File2}_${data6}
-fi
-
-head -n -$i ${File2}_list > ${File2}_temp
-
-done
-done
-
+# Cleanup
 rm *_temp *.fai
 
-rm Gene_extraction_report 2> /dev/null
-for f in `ls *.fasta | sed 's/.fasta//'`
-do
-
-echo -ne $f >> Gene_extraction_report
-
-for gene1 in `more *_ref | grep ">" | sed 's/>//g'`
-do
-
-count1=$(awk '/^>/{l=0; next}{l+=length($0)}END{print l}' ${f}_${gene1})
-echo -ne '\t' $count1 >> Gene_extraction_report
-
+# Generate Gene Extraction Report
+rm -f Gene_extraction_report
+for file in *.fasta; do
+    base_name="${file%.fasta}"
+    echo -ne "$base_name" >> Gene_extraction_report
+    
+    for gene in $(grep ">" *_ref | sed 's/>//g'); do
+        count=$(awk '/^>/{l=0; next}{l+=length($0)}END{print l}' "${base_name}_$gene")
+        echo -ne "\t$count" >> Gene_extraction_report
+    done
+    echo >> Gene_extraction_report
 done
 
-echo  >> Gene_extraction_report
+# Format Report
+{
+    echo -ne "ID\t"
+    grep ">" *_ref | sed 's/>//g' | tr '\n' '\t'
+    echo
+    cat Gene_extraction_report
+} > GyrA_report.csv
+rm -f Gene_extraction_report
 
+# Translate Sequences
+for file in *_GyrA; do
+    seqkit translate --frame 1 --frame 2 --frame 3 --trim "$file" | \
+    awk '/^>/ {sub("Contig_", "", $0); sub(":.*", "", $0); header=$0; next} {seq=seq $0} 
+         END {print header; print seq}' | \
+    awk 'BEGIN {max=0} /^>/ {header=$0; next} {if (length($0) > max) {max = length($0); longest = $0; longest_header = header}} 
+         END {print longest_header; print longest}' > "${file}.aa"
 done
 
-echo -ne "ID" '\t' >> temp
-for gene2 in `more *_ref | grep ">" | sed 's/>//g'`
-do
+seqkit translate --frame 1 --frame 2 --frame 3 --trim gyrA_ref | \
+awk '/^>/ {sub("Contig_", "", $0); sub(":.*", "", $0); header=$0; next} {seq=seq $0} 
+     END {print header; print seq}' | \
+awk 'BEGIN {max=0} /^>/ {header=$0; next} {if (length($0) > max) {max = length($0); longest = $0; longest_header = header}} 
+     END {print longest_header; print longest}' > 26695_GyrA.aa
 
-echo -ne $gene2 '\t' >> temp
-
-done
-echo >> temp
-cat temp Gene_extraction_report > temp1
-rm Gene_extraction_report
-mv temp1 GyrA_report.csv
-rm temp
-
-for File3 in `ls *_GyrA | sed 's/_GyrA//'`
-do
-seqkit translate ${File3}_GyrA > ${File3}_GyrA.aa
-seqkit translate gyrA_ref > 26695_GyrA.aa
-done
-
+# Align Sequences
 cat *.aa > GyrA_all
 clustalo -i GyrA_all -o GyrA_all.aln
+sed -i 's/:.*//g; s/_len=.*//g' GyrA_all.aln
 
-sed -i 's/:.*//g' GyrA_all.aln
-sed -i 's/_len=.*//g' GyrA_all.aln
-
-more GyrA_all.aln | grep ">" | sed 's/>//g' > list.temp
-
+# Extract GyrA from the alignment file to include any indels that may change the position
 for f1 in `more GyrA_all.aln | grep ">" | sed 's/>//g'`
 do
 samtools faidx GyrA_all.aln $f1 > ${f1}.fasta_temp
-
 done
 
-rm GyrA_AA.csv 2> /dev/null
+# Extract mutation sites
+seqkit locate -i -p RIVGDVIGKYHPHGDN GyrA.fasta_temp > GyrA.fasta_temp2_1
+sed -i '1d' GyrA.fasta_temp2_1
+data1=$(awk 'NR==1 {print $6}' GyrA.fasta_temp2_1)
 
-rm *_temp1
-
-seqkit locate -i -p RIVGDVIGKYHPHGDN GyrA.fasta_temp > GyrA.fasta_temp2_1 #position N87
-
-sed -i '1 d' GyrA.fasta_temp2_1
-data1=$(head -1 GyrA.fasta_temp2_1 | awk '{print $6}') 
-
-
-for f2 in `ls *.fasta_temp`
-do
-data2=$(head -1 ${f2} | sed 's/>//')
-samtools faidx $f2 $data2:$data1-$data1 > ${f2}_1
-data3=$(more ${f2}_1 | sed '1 d')
-
-rm *.fai
-data1_1=$(($data1 +4)) #position 91
-samtools faidx $f2 $data2:$data1_1-$data1_1 > ${f2}_2
-data3_1=$(more ${f2}_2 | sed '1 d')
-
-echo -ne $data2 '\t' $data3 '\t' $data3_1 '\n' >> report_temp
-
+# Report mutations
+rm -f report_temp
+for f2 in *.fasta_temp; do
+    data2=$(head -1 "$f2" | sed 's/>//')
+    samtools faidx "$f2" "$data2:$data1-$data1" > "${f2}_1"
+    data3=$(sed '1d' "${f2}_1")
+    
+    rm *.fai
+    data1_1=$((data1 + 4)) #position 91
+    samtools faidx "$f2" "$data2:$data1_1-$data1_1" > "${f2}_2"
+    data3_1=$(sed '1d' "${f2}_2")
+    
+    echo -e "$data2\t$data3\t$data3_1" >> report_temp
 done
 
-echo -ne "ID" '\t' "N87" '\t' "D91" '\n' > temp_heading
-cat temp_heading report_temp > GyrA_AA_${today_date}.csv
-rm *temp*
+# Finalize Mutation Report
+echo -e "ID\tN87\tD91" > temp_heading
+cat temp_heading report_temp > "GyrA_AA_${today_date}.csv"
+rm -f *temp* *.fai
