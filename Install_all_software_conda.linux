@@ -21,11 +21,16 @@ conda install -y -c conda-forge -c bioconda -c defaults \
 # Install additional dependencies via APT and PIP
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python-is-python3 python3-pip seqkit rename clustalo \
-                    pilon seqtk trimmomatic velvet bwa libboost-all-dev pigz flash2
+                    pilon seqtk trimmomatic velvet bwa libboost-all-dev pigz 
 pip3 install --upgrade biopython gdown
 
 wget http://mirrors.kernel.org/ubuntu/pool/main/libi/libidn/libidn11_1.33-2.2ubuntu2_amd64.deb
 sudo apt install ./libidn11_1.33-2.2ubuntu2_amd64.deb
+
+# Install flash2
+git clone https://github.com/dstreett/FLASH2.git
+cd FLASH2
+make
 
 # Clone and install DFAST and Prodigal
 git clone https://github.com/nigyta/dfast_core.git
@@ -103,6 +108,7 @@ paths=(
     "~/Bioinformatics"
     "~/Bioinformatics/Scripts_dir"
     "~/Bioinformatics/bbmap"
+    "~/Bioinformatics/FLASH2"
 )
 
 # File to modify
