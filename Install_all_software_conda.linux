@@ -83,26 +83,42 @@ chmod +x ~/Bioinformatics/trimmomatic
 wget https://telkomuniversity.dl.sourceforge.net/project/bbmap/BBMap_39.00.tar.gz
 tar -xvzf BBMap_39.00.tar.gz
 
-# Add installed tools to PATH
-cat <<EOF >> ~/.bashrc
-export PATH=\$PATH:~/Bioinformatics/dfast_core/
-export PATH=\$PATH:~/Bioinformatics/dfast_core/bin/Linux
-export PATH=\$PATH:~/Bioinformatics/dfast_core/scripts
-export PATH=\$PATH:~/Bioinformatics/dfast_core/dfc
-export PATH=\$PATH:~/Bioinformatics/dfast_core/dfc/tools
-export PATH=\$PATH:~/Bioinformatics/dfast_core/dfc/components
-export PATH=\$PATH:~/Bioinformatics/ghostx-1.3.7/src
-export PATH=\$PATH:~/Bioinformatics/SPAdes-4.0.0-Linux/bin
-export PATH=\$PATH:~/Bioinformatics/Lighter-1.1.2
-export PATH=\$PATH:~/Bioinformatics/FLASH-1.2.11-Linux-x86_64
-export PATH=\$PATH:~/Bioinformatics/MEGAHIT-1.2.9-Linux-x86_64-static/bin
-export PATH=\$PATH:~/Bioinformatics/samclip-0.4.0
-export PATH=\$PATH:~/Bioinformatics/Trimmomatic-0.39
-export PATH=\$PATH:~/Bioinformatics/shovill/bin
-export PATH=\$PATH:~/Bioinformatics/SKESA
-export PATH=\$PATH:~/Bioinformatics
-export PATH=\$PATH:~/Bioinformatics/bbmap
-EOF
+# Define the paths to add
+paths=(
+    "~/Bioinformatics/dfast_core/"
+    "~/Bioinformatics/dfast_core/bin/Linux"
+    "~/Bioinformatics/dfast_core/scripts"
+    "~/Bioinformatics/dfast_core/dfc"
+    "~/Bioinformatics/dfast_core/dfc/tools"
+    "~/Bioinformatics/dfast_core/dfc/components"
+    "~/Bioinformatics/ghostx-1.3.7/src"
+    "~/Bioinformatics/SPAdes-4.0.0-Linux/bin"
+    "~/Bioinformatics/Lighter-1.1.2"
+    "~/Bioinformatics/FLASH-1.2.11-Linux-x86_64"
+    "~/Bioinformatics/MEGAHIT-1.2.9-Linux-x86_64-static/bin"
+    "~/Bioinformatics/samclip-0.4.0"
+    "~/Bioinformatics/Trimmomatic-0.39"
+    "~/Bioinformatics/shovill/bin"
+    "~/Bioinformatics/SKESA"
+    "~/Bioinformatics"
+    "~/Bioinformatics/Scripts_dir"
+    "~/Bioinformatics/bbmap"
+)
+
+# File to modify
+BASHRC="$HOME/.bashrc"
+
+# Loop through each path and add only if not already present
+for path in "${paths[@]}"; do
+    if ! grep -qxF "export PATH=\$PATH:$path" "$BASHRC"; then
+        echo "export PATH=\$PATH:$path" >> "$BASHRC"
+    fi
+done
+
+# Apply changes
+source "$BASHRC"
+
+echo "PATH updated successfully!"
 
 # Apply changes
 source ~/.bashrc
