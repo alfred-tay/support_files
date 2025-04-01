@@ -1,5 +1,6 @@
 #!/bin/bash
 
+sudo apt update && sudo apt upgrade -y
 # Set up working directories
 mkdir -p ~/Bioinformatics/Scripts_dir
 cd ~/Bioinformatics
@@ -21,7 +22,6 @@ conda install -y -c conda-forge -c bioconda -c defaults \
     quast fastp fastqc abricate samtools blast trimal
 
 # Install additional dependencies via APT and PIP
-sudo apt update && sudo apt upgrade -y
 sudo apt install -y python-is-python3 python3-pip seqkit rename clustalo \
                     pilon seqtk trimmomatic velvet bwa libboost-all-dev pigz screen fasttree htop
 pip3 install --upgrade biopython gdown
