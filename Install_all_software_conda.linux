@@ -1,16 +1,18 @@
 #!/bin/bash
 
 # Set up working directories
-mkdir -p ~/Bioinformatics/Script_dir
+mkdir -p ~/Bioinformatics/Scripts_dir
 cd ~/Bioinformatics
 
 # Install Miniconda
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 bash Miniconda3-latest-Linux-x86_64.sh -b
-echo 'export PATH=$HOME/miniconda3/bin:$PATH' >> ~/.bashrc
-source ~/.bashrc
 
-# Activate and update Conda
+# Add Miniconda to PATH and initialize Conda
+echo 'export PATH=$HOME/miniconda3/bin:$PATH' >> ~/.bashrc
+source $HOME/miniconda3/etc/profile.d/conda.sh
+
+# Initialize Conda and update all packages
 conda init
 conda update --all -y
 
