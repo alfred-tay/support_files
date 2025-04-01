@@ -16,7 +16,7 @@ conda update --all -y
 
 # Install essential bioinformatics tools via Conda
 conda install -y -c conda-forge -c bioconda -c defaults \
-    quast fastp proteinortho fastqc abricate samtools blast trimal
+    quast fastp fastqc abricate samtools blast trimal
 
 # Install additional dependencies via APT and PIP
 sudo apt update && sudo apt upgrade -y
@@ -26,6 +26,9 @@ pip3 install --upgrade biopython gdown
 
 wget http://mirrors.kernel.org/ubuntu/pool/main/libi/libidn/libidn11_1.33-2.2ubuntu2_amd64.deb
 sudo apt install ./libidn11_1.33-2.2ubuntu2_amd64.deb
+
+# Install proteinortho
+git clone https://gitlab.com/paulklemm_PHD/proteinortho.git
 
 # Install flash2
 git clone https://github.com/dstreett/FLASH2.git
@@ -109,6 +112,7 @@ paths=(
     "~/Bioinformatics/Scripts_dir"
     "~/Bioinformatics/bbmap"
     "~/Bioinformatics/FLASH2"
+    "~/Bioinformatics/proteinortho"
 )
 
 # File to modify
