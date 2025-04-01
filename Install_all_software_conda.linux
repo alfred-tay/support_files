@@ -36,6 +36,7 @@ git clone https://gitlab.com/paulklemm_PHD/proteinortho.git
 git clone https://github.com/dstreett/FLASH2.git
 cd FLASH2
 make
+cd ..
 
 # Clone and install DFAST and Prodigal
 git clone https://github.com/nigyta/dfast_core.git
