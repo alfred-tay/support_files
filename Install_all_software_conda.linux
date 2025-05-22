@@ -30,7 +30,7 @@ wget http://mirrors.kernel.org/ubuntu/pool/main/libi/libidn/libidn11_1.33-2.2ubu
 sudo apt install ./libidn11_1.33-2.2ubuntu2_amd64.deb
 
 # Install proteinortho
-git clone https://gitlab.com/paulklemm_PHD/proteinortho.git
+#git clone https://gitlab.com/paulklemm_PHD/proteinortho.git
 
 # Install flash2
 git clone https://github.com/dstreett/FLASH2.git
