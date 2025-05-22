@@ -9,11 +9,13 @@ TODAY_DATE=$(date +"%d-%m-%y")
 REF_DB_DIR=~/miniconda3/db/23s_ref
 REF_FILE=23s_ref
 
-rm -f $REF_FILE 2> /dev/null
-wget -q https://raw.githubusercontent.com/alfred-tay/support_files/main/$REF_FILE
-mkdir -p $REF_DB_DIR
-cp $REF_FILE $REF_DB_DIR/sequences
-abricate --setupdb
+  mkdir -p $REF_DB_DIR
+  cat > ~/miniconda3/db/23s_ref/sequences <<EOF
+>23s
+TAAGGCAGTGGTAGCGCTGAAGAATATTCGTGCAATTGTCGTTATTCATTATAAAAAGGGCGGGTTTTAAAGGATATTTTAAAATTTAAAACAAGCTTTTAAGAGCAGATGGCGGATGCCTTGCCAAAGAGAGGCGATGAAGGACGTACTAGACTGCGATAAGCTATGCGGAGCTGTCAAGG>
+EOF
+  cp ~/miniconda3/db/23s_ref/sequences ./23s_ref
+  abricate --setupdb
 
 # Rename .fa files to .fasta
 for FILE in *.fa; do
