@@ -137,7 +137,7 @@ install_apt_pip_deps() {
         log_message "${GREEN}APT and PIP dependencies appear to be installed. Skipping installation.${NC}"
     else
         sudo apt install -y python-is-python3 python3-pip seqkit rename clustalo \
-                             pilon seqtk trimmomatic velvet bwa libboost-all-dev pigz screen fasttree htop git
+                             pilon seqtk trimmomatic velvet bwa libboost-all-dev pigz screen fasttree htop git rename dos2unix
         pip3 install --upgrade biopython gdown
 
         if [ ! -f /usr/lib/x86_64-linux-gnu/libidn.so.11 ]; then
