@@ -124,7 +124,7 @@ install_conda_tools() {
             log_message "${GREEN}Abricate databases appear to be installed. Skipping setup.${NC}"
         else
             log_message "${YELLOW}Running 'abricate --setupdb' to install databases... This may take some time.${NC}"
-            abricate --setupdb || { log_message "${RED}Failed to setup Abricate databases. Exiting.${NC}"; exit 1; }
+            abricate --quiet --setupdb || { log_message "${RED}Failed to setup Abricate databases. Exiting.${NC}"; exit 1; }
             log_message "${GREEN}Abricate databases setup complete.${NC}"
         fi
     else
