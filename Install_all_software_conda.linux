@@ -90,13 +90,19 @@ setup_conda_channels() {
 install_conda_tools() {
     log_message "${YELLOW}Installing essential bioinformatics tools via Conda into the base environment...${NC}"
 
-    # We don't activate a specific environment, as we're targeting 'base' by default
-    # Ensure base environment is ready for installations (e.g., has Python)
-    log_message "${YELLOW}Ensuring base environment has Python 3.12.10 (from conda-forge).${NC}"
-    conda install -y python=3.12.10 -c conda-forge \
-        || { log_message "${RED}Failed to ensure Python 3.12.10 in base environment. Exiting.${NC}"; exit 1; }
+    # Check Python version in base environment
+    CURRENT_PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "not_found")
+    TARGET_PYTHON_VERSION="3.12"
 
-    # Check for a representative tool (e.g., fastqc) in the active environment
+    if [[ "$CURRENT_PYTHON_VERSION" == "$TARGET_PYTHON_VERSION" ]]; then
+        log_message "${GREEN}Python $TARGET_PYTHON_VERSION.* is already installed in the base environment. Skipping Python installation.${NC}"
+    else
+        log_message "${YELLOW}Ensuring base environment has Python 3.12.10 (from conda-forge). Current Python: $CURRENT_PYTHON_VERSION${NC}"
+        conda install -y python=3.12.10 -c conda-forge \
+            || { log_message "${RED}Failed to ensure Python 3.12.10 in base environment. Exiting.${NC}"; exit 1; }
+    fi
+
+    # Check for a representative tool (e.g., fastqc) in the base environment
     if command_exists fastqc && command_exists abricate; then
         log_message "${GREEN}Core Conda bioinformatics tools (including abricate) appear to be installed in the base environment. Skipping.${NC}"
     else
@@ -114,7 +120,7 @@ install_conda_tools() {
     if command_exists abricate; then
         # Check if a known Abricate database (e.g., ncbi) directory exists and is populated
         # This is a heuristic check, a full check would be more complex.
-        if [ -d "$HOME/.abricate/db/ncbi" ] && [ "$(ls -A $HOME/.abricate/db/ncbi 2>/dev/null | wc -l)" -gt 0 ]; then
+        if [ -d "$HOME/.abricate/db/ncbi" ] && [ "$(ls -A "$HOME/.abricate/db/ncbi" 2>/dev/null | wc -l)" -gt 0 ]; then
             log_message "${GREEN}Abricate databases appear to be installed. Skipping setup.${NC}"
         else
             log_message "${YELLOW}Running 'abricate --setupdb' to install databases... This may take some time.${NC}"
@@ -126,18 +132,17 @@ install_conda_tools() {
         exit 1
     fi
     # --- End Abricate database setup ---
-
-    # No deactivation needed as we are in base
 }
 
 ## APT and PIP Dependencies Installation (No change here, as they're system-wide)
 install_apt_pip_deps() {
     log_message "${YELLOW}Installing additional dependencies via APT and PIP...${NC}"
-    if command_exists seqkit; then
+    # Added rename and dos2unix here
+    if command_exists seqkit && command_exists rename && command_exists dos2unix; then
         log_message "${GREEN}APT and PIP dependencies appear to be installed. Skipping installation.${NC}"
     else
-        sudo apt install -y python-is-python3 python3-pip seqkit rename clustalo \
-                             pilon seqtk trimmomatic velvet bwa libboost-all-dev pigz screen fasttree htop git rename dos2unix
+        sudo apt install -y python-is-python3 python3-pip seqkit rename dos2unix clustalo \
+                             pilon seqtk trimmomatic velvet bwa libboost-all-dev pigz screen fasttree htop git
         pip3 install --upgrade biopython gdown
 
         if [ ! -f /usr/lib/x86_64-linux-gnu/libidn.so.11 ]; then
@@ -233,7 +238,7 @@ update_path() {
         "$HOME/Bioinformatics/bbmap"
         "$HOME/Bioinformatics/FLASH2"
         "$HOME/Bioinformatics/proteinortho" # Assuming proteinortho is cloned here if not using conda
-        "$HOME/miniconda3/bin" # Ensure miniconda bin is in PATH for conda base tools (this is the key for base env)
+        "$HOME/miniconda3/bin" # Ensure miniconda bin is in PATH for conda base tools
     )
 
     for path in "${paths[@]}"; do
