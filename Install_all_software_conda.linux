@@ -1,139 +1,287 @@
 #!/bin/bash
 
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
+# Define color codes for pretty output
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+LOG_FILE="$HOME/bioinformatics_setup.log"
+# Removed CONDA_ENV_NAME as we are using the base environment
+
+# Function to log messages with timestamps
+log_message() {
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+log_message "${GREEN}Starting comprehensive bioinformatics tools setup...${NC}"
+
+## System Update and Directory Setup
+log_message "${YELLOW}Updating and upgrading system packages...${NC}"
 sudo apt update && sudo apt upgrade -y
+
 # Set up working directories
-mkdir -p ~/Bioinformatics/Scripts_dir
-cd ~/Bioinformatics
+log_message "${YELLOW}Setting up working directories...${NC}"
+mkdir -p "$HOME/Bioinformatics/Scripts_dir"
+cd "$HOME/Bioinformatics"
 
-# Install Miniconda
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash Miniconda3-latest-Linux-x86_64.sh -b
+# Function to check if a command exists
+command_exists () {
+    type "$1" &> /dev/null
+}
 
-# Add Miniconda to PATH and initialize Conda
-echo 'export PATH=$HOME/miniconda3/bin:$PATH' >> ~/.bashrc
-source $HOME/miniconda3/etc/profile.d/conda.sh
+## Miniconda Installation
+install_miniconda() {
+    local MINICONDA_PATH="$HOME/miniconda3"
+    local MINICONDA_BIN_PATH="$MINICONDA_PATH/bin"
+    local CONDA_SH_PATH="$MINICONDA_PATH/etc/profile.d/conda.sh"
 
-# Initialize Conda and update all packages
-conda init
-conda update --all -y
+    if command_exists conda; then
+        log_message "${GREEN}Miniconda is already installed. Ensuring it's properly sourced.${NC}"
+        # Ensure conda.sh is sourced for the current shell to use 'conda' command reliably
+        if [ -f "$CONDA_SH_PATH" ]; then
+            source "$CONDA_SH_PATH"
+            log_message "Conda profile sourced for current session."
+        else
+            log_message "${RED}Error: conda.sh not found at $CONDA_SH_PATH. Miniconda might be corrupted or not fully installed. Exiting.${NC}"; exit 1;
+        fi
+    else
+        log_message "${YELLOW}Installing Miniconda...${NC}"
+        wget -q --show-progress https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh || { log_message "${RED}Failed to download Miniconda installer. Exiting.${NC}"; exit 1; }
+        bash miniconda.sh -b -p "$MINICONDA_PATH" || { log_message "${RED}Failed to install Miniconda. Exiting.${NC}"; exit 1; }
+        rm miniconda.sh
 
-# Install essential bioinformatics tools via Conda
-conda install -y -c conda-forge -c bioconda -c defaults \
-    quast fastp fastqc abricate samtools blast trimal proteinortho
+        # Add Miniconda to PATH in .bashrc and initialize Conda
+        log_message "Adding Miniconda to PATH in ~/.bashrc and initializing Conda."
+        # Use a more robust check to avoid duplicates in .bashrc
+        if ! grep -q "export PATH=.*$MINICONDA_BIN_PATH" "$HOME/.bashrc"; then
+            echo 'export PATH=$HOME/miniconda3/bin:$PATH' >> "$HOME/.bashrc"
+        fi
+        # Source immediately to make conda command available in the current shell
+        source "$HOME/.bashrc" || { log_message "${RED}Failed to source .bashrc after Miniconda install. Please source it manually or open a new terminal. Exiting.${NC}"; exit 1; }
+        # Explicitly source conda.sh which is what conda init does
+        source "$CONDA_SH_PATH" || { log_message "${RED}Failed to source conda.sh. Exiting.${NC}"; exit 1; }
+        conda init bash || true # Use true to prevent exit on error if already initialized
 
-# Install additional dependencies via APT and PIP
-sudo apt install -y python-is-python3 python3-pip seqkit rename clustalo \
-                    pilon seqtk trimmomatic velvet bwa libboost-all-dev pigz screen fasttree htop git
-pip3 install --upgrade biopython gdown
-
-wget http://mirrors.kernel.org/ubuntu/pool/main/libi/libidn/libidn11_1.33-2.2ubuntu2_amd64.deb
-sudo apt install ./libidn11_1.33-2.2ubuntu2_amd64.deb
-
-# Install proteinortho
-#git clone https://gitlab.com/paulklemm_PHD/proteinortho.git
-
-# Install flash2
-git clone https://github.com/dstreett/FLASH2.git
-cd FLASH2
-make
-cd ..
-
-# Clone and install DFAST and Prodigal
-git clone https://github.com/nigyta/dfast_core.git
-git clone https://github.com/hyattpd/Prodigal.git
-cd Prodigal && sudo make install && cd ..
-
-# Install GhostX
-wget http://www.bi.cs.titech.ac.jp/ghostx/releases/ghostx-1.3.7.tar.gz
-tar xvzf ghostx-1.3.7.tar.gz
-cd ghostx-1.3.7/src && make && cd ../..
-
-# Install Shovill
-git clone https://github.com/tseemann/shovill.git
-
-# Install SPAdes
-wget https://github.com/ablab/spades/releases/download/v4.0.0/SPAdes-4.0.0-Linux.tar.gz
-tar -xzf SPAdes-4.0.0-Linux.tar.gz
-
-# Install FLASH
-wget http://ccb.jhu.edu/software/FLASH/FLASH-1.2.11-Linux-x86_64.tar.gz
-tar xzvf FLASH-1.2.11-Linux-x86_64.tar.gz
-
-# Install KMC
-wget https://github.com/refresh-bio/KMC/releases/download/v3.0.0/KMC3.linux.tar.gz
-tar xzvf KMC3.linux.tar.gz
-
-# Install Lighter
-wget https://github.com/mourisl/Lighter/archive/v1.1.2.tar.gz
-tar xzvf v1.1.2.tar.gz
-cd Lighter-1.1.2 && sudo make && cd ..
-
-# Install MEGAHIT
-wget https://github.com/voutcn/megahit/releases/download/v1.2.9/MEGAHIT-1.2.9-Linux-x86_64-static.tar.gz
-tar xzvf MEGAHIT-1.2.9-Linux-x86_64-static.tar.gz
-
-# Install Samclip
-wget https://github.com/tseemann/samclip/archive/v0.4.0.tar.gz
-tar xzvf v0.4.0.tar.gz
-
-# Install SKESA
-git clone https://github.com/ncbi/SKESA
-cd SKESA
-rm Makefile.nongs
-wget https://raw.githubusercontent.com/alfred-tay/support_files/main/Makefile.nongs
-sudo make -f Makefile.nongs BOOST_PATH=/usr
-cd ..
-
-# Install Trimmomatic
-wget http://www.usadellab.org/cms/uploads/supplementary/Trimmomatic/Trimmomatic-0.39.zip
-unzip Trimmomatic-0.39.zip
-echo -e '#!/bin/bash\njava -jar ~/Bioinformatics/Trimmomatic-0.39/trimmomatic-0.39.jar "$@"' > ~/Bioinformatics/trimmomatic
-chmod +x ~/Bioinformatics/trimmomatic
-
-# Install BBMap
-wget -O bbmap.tar.gz https://sourceforge.net/projects/bbmap/files/latest/download
-tar -xvzf bbmap.tar.gz
-
-# Define the paths to add
-paths=(
-    "~/Bioinformatics/dfast_core/"
-    "~/Bioinformatics/dfast_core/bin/Linux"
-    "~/Bioinformatics/dfast_core/scripts"
-    "~/Bioinformatics/dfast_core/dfc"
-    "~/Bioinformatics/dfast_core/dfc/tools"
-    "~/Bioinformatics/dfast_core/dfc/components"
-    "~/Bioinformatics/ghostx-1.3.7/src"
-    "~/Bioinformatics/SPAdes-4.0.0-Linux/bin"
-    "~/Bioinformatics/Lighter-1.1.2"
-    "~/Bioinformatics/FLASH-1.2.11-Linux-x86_64"
-    "~/Bioinformatics/MEGAHIT-1.2.9-Linux-x86_64-static/bin"
-    "~/Bioinformatics/samclip-0.4.0"
-    "~/Bioinformatics/Trimmomatic-0.39"
-    "~/Bioinformatics/shovill/bin"
-    "~/Bioinformatics/SKESA"
-    "~/Bioinformatics"
-    "~/Bioinformatics/Scripts_dir"
-    "~/Bioinformatics/bbmap"
-    "~/Bioinformatics/FLASH2"
-    "~/Bioinformatics/proteinortho"
-)
-
-# File to modify
-BASHRC="$HOME/.bashrc"
-
-# Loop through each path and add only if not already present
-for path in "${paths[@]}"; do
-    if ! grep -qxF "export PATH=\$PATH:$path" "$BASHRC"; then
-        echo "export PATH=\$PATH:$path" >> "$BASHRC"
+        log_message "${GREEN}Miniconda installed and initialized.${NC}"
     fi
-done
 
-# Apply changes
-source "$BASHRC"
+    # Clean conda cache (important after install or before major operations)
+    log_message "${YELLOW}Cleaning Conda cache...${NC}"
+    conda clean --all -y || true
+}
 
-echo "PATH updated successfully!"
+## Conda Channel Setup (No environment creation)
+setup_conda_channels() {
+    log_message "${YELLOW}Setting up Conda channels...${NC}"
 
-# Apply changes
-source ~/.bashrc
+    # Add channels globally (or they can be specified during 'conda install')
+    conda config --add channels bioconda
+    conda config --add channels conda-forge
+    conda config --set channel_priority strict
+    conda config --set solver libmamba
+    log_message "${GREEN}Global Conda channels configured.${NC}"
+}
 
-echo "Setup complete!"
+## Conda Bioinformatics Tools Installation (Into base environment)
+install_conda_tools() {
+    log_message "${YELLOW}Installing essential bioinformatics tools via Conda into the base environment...${NC}"
+
+    # We don't activate a specific environment, as we're targeting 'base' by default
+    # Ensure base environment is ready for installations (e.g., has Python)
+    log_message "${YELLOW}Ensuring base environment has Python 3.12.10 (from conda-forge).${NC}"
+    conda install -y python=3.12.10 -c conda-forge \
+        || { log_message "${RED}Failed to ensure Python 3.12.10 in base environment. Exiting.${NC}"; exit 1; }
+
+    # Check for a representative tool (e.g., fastqc) in the active environment
+    if command_exists fastqc && command_exists abricate; then
+        log_message "${GREEN}Core Conda bioinformatics tools (including abricate) appear to be installed in the base environment. Skipping.${NC}"
+    else
+        log_message "${YELLOW}Installing tools into the base environment...${NC}"
+        # Removed perl-pathtiny from this list to resolve the PackagesNotFoundError
+        conda install -y \
+            quast fastp fastqc abricate samtools blast trimal proteinortho \
+            || { log_message "${RED}Conda installation failed for core bioinformatics tools into base environment. Exiting.${NC}"; exit 1; }
+        log_message "${GREEN}Core Conda bioinformatics tools installed in the base environment.${NC}"
+    fi
+
+    # --- Abricate database setup ---
+    log_message "${YELLOW}Checking and setting up Abricate databases...${NC}"
+    # Ensure abricate command is available in the current shell for setupdb
+    if command_exists abricate; then
+        # Check if a known Abricate database (e.g., ncbi) directory exists and is populated
+        # This is a heuristic check, a full check would be more complex.
+        if [ -d "$HOME/.abricate/db/ncbi" ] && [ "$(ls -A $HOME/.abricate/db/ncbi 2>/dev/null | wc -l)" -gt 0 ]; then
+            log_message "${GREEN}Abricate databases appear to be installed. Skipping setup.${NC}"
+        else
+            log_message "${YELLOW}Running 'abricate --setupdb' to install databases... This may take some time.${NC}"
+            abricate --setupdb || { log_message "${RED}Failed to setup Abricate databases. Exiting.${NC}"; exit 1; }
+            log_message "${GREEN}Abricate databases setup complete.${NC}"
+        fi
+    else
+        log_message "${RED}Abricate command not found, cannot set up databases. Please check Conda installation.${NC}"
+        exit 1
+    fi
+    # --- End Abricate database setup ---
+
+    # No deactivation needed as we are in base
+}
+
+## APT and PIP Dependencies Installation (No change here, as they're system-wide)
+install_apt_pip_deps() {
+    log_message "${YELLOW}Installing additional dependencies via APT and PIP...${NC}"
+    if command_exists seqkit; then
+        log_message "${GREEN}APT and PIP dependencies appear to be installed. Skipping installation.${NC}"
+    else
+        sudo apt install -y python-is-python3 python3-pip seqkit rename clustalo \
+                             pilon seqtk trimmomatic velvet bwa libboost-all-dev pigz screen fasttree htop git
+        pip3 install --upgrade biopython gdown
+
+        if [ ! -f /usr/lib/x86_64-linux-gnu/libidn.so.11 ]; then
+            log_message "${YELLOW}Installing libidn11...${NC}"
+            wget -q --show-progress http://mirrors.kernel.org/ubuntu/pool/main/libi/libidn/libidn11_1.33-2.2ubuntu2_amd64.deb -O libidn11.deb || { log_message "${RED}Failed to download libidn11. Exiting.${NC}"; exit 1; }
+            sudo apt install -y ./libidn11.deb || { log_message "${RED}Failed to install libidn11. Exiting.${NC}"; exit 1; }
+            rm libidn11.deb
+            log_message "${GREEN}libidn11 installed.${NC}"
+        else
+            log_message "${GREEN}libidn11 is already installed. Skipping.${NC}"
+        fi
+        log_message "${GREEN}APT and PIP dependencies installed.${NC}"
+    fi
+}
+
+## Specific Tool Installations (Compile/Clone)
+install_flash2() {
+    if [ -d "FLASH2" ]; then log_message "${GREEN}FLASH2 is already cloned. Skipping installation.${NC}"; else log_message "${YELLOW}Installing FLASH2...${NC}"; git clone https://github.com/dstreett/FLASH2.git || { log_message "${RED}Failed to clone FLASH2. Exiting.${NC}"; exit 1; }; cd FLASH2; make || { log_message "${RED}Failed to make FLASH2. Exiting.${NC}"; exit 1; }; cd ..; log_message "${GREEN}FLASH2 installed.${NC}"; fi
+}
+install_dfast_prodigal() {
+    if command_exists prodigal && [ -d "dfast_core" ]; then log_message "${GREEN}DFAST and Prodigal appear to be installed. Skipping installation.${NC}"; else log_message "${YELLOW}Cloning and installing DFAST and Prodigal...${NC}"; git clone https://github.com/nigyta/dfast_core.git || { log_message "${RED}Failed to clone dfast_core. Exiting.${NC}"; exit 1; }; git clone https://github.com/hyattpd/Prodigal.git || { log_message "${RED}Failed to clone Prodigal. Exiting.${NC}"; exit 1; }; cd Prodigal && sudo make install && cd .. || { log_message "${RED}Failed to make and install Prodigal. Exiting.${NC}"; exit 1; }; log_message "${GREEN}DFAST and Prodigal installed.${NC}"; fi
+}
+install_ghostx() {
+    if [ -d "ghostx-1.3.7" ]; then log_message "${GREEN}GhostX is already installed. Skipping installation.${NC}"; else log_message "${YELLOW}Installing GhostX...${NC}"; wget -q --show-progress http://www.bi.cs.titech.ac.jp/ghostx/releases/ghostx-1.3.7.tar.gz || { log_message "${RED}Failed to download GhostX. Exiting.${NC}"; exit 1; }; tar xvzf ghostx-1.3.7.tar.gz || { log_message "${RED}Failed to extract GhostX. Exiting.${NC}"; exit 1; }; rm ghostx-1.3.7.tar.gz; cd ghostx-1.3.7/src && make && cd ../.. || { log_message "${RED}Failed to make GhostX. Exiting.${NC}"; exit 1; }; log_message "${GREEN}GhostX installed.${NC}"; fi
+}
+install_shovill() {
+    if [ -d "shovill" ]; then log_message "${GREEN}Shovill is already cloned. Skipping installation.${NC}"; else log_message "${YELLOW}Installing Shovill...${NC}"; git clone https://github.com/tseemann/shovill.git || { log_message "${RED}Failed to clone Shovill. Exiting.${NC}"; exit 1; }; log_message "${GREEN}Shovill installed.${NC}"; fi
+}
+install_spades() {
+    local SPADES_VERSION="4.2.0"
+    local SPADES_DIR="SPAdes-${SPADES_VERSION}-Linux"
+    local SPADES_TAR="SPAdes-${SPADES_VERSION}-Linux.tar.gz"
+    local SPADES_URL="https://github.com/ablab/spades/releases/download/v${SPADES_VERSION}/${SPADES_TAR}"
+
+    if [ -d "$SPADES_DIR" ]; then
+        log_message "${GREEN}SPAdes v${SPADES_VERSION} is already installed. Skipping installation.${NC}"
+    else
+        log_message "${YELLOW}Installing SPAdes v${SPADES_VERSION}...${NC}"
+        wget -q --show-progress "$SPADES_URL" -O "$SPADES_TAR" || { log_message "${RED}Failed to download SPAdes v${SPADES_VERSION}. Exiting.${NC}"; exit 1; }
+        tar -xzf "$SPADES_TAR" || { log_message "${RED}Failed to extract SPAdes v${SPADES_VERSION}. Exiting.${NC}"; exit 1; }
+        rm "$SPADES_TAR"
+        log_message "${GREEN}SPAdes v${SPADES_VERSION} installed.${NC}"
+    fi
+}
+install_flash() {
+    if [ -d "FLASH-1.2.11-Linux-x86_64" ]; then log_message "${GREEN}FLASH is already installed. Skipping installation.${NC}"; else log_message "${YELLOW}Installing FLASH...${NC}"; wget -q --show-progress http://ccb.jhu.edu/software/FLASH/FLASH-1.2.11-Linux-x86_64.tar.gz || { log_message "${RED}Failed to download FLASH. Exiting.${NC}"; exit 1; }; tar xzvf FLASH-1.2.11-Linux-x86_64.tar.gz || { log_message "${RED}Failed to extract FLASH. Exiting.${NC}"; exit 1; }; rm FLASH-1.2.11-Linux-x86_64.tar.gz; log_message "${GREEN}FLASH installed.${NC}"; fi
+}
+install_kmc() {
+    if [ -d "KMC3.linux" ]; then log_message "${GREEN}KMC is already installed. Skipping installation.${NC}"; else log_message "${YELLOW}Installing KMC...${NC}"; wget -q --show-progress https://github.com/refresh-bio/KMC/releases/download/v3.0.0/KMC3.linux.tar.gz || { log_message "${RED}Failed to download KMC. Exiting.${NC}"; exit 1; }; tar xzvf KMC3.linux.tar.gz || { log_message "${RED}Failed to extract KMC. Exiting.${NC}"; exit 1; }; rm KMC3.linux.tar.gz; log_message "${GREEN}KMC installed.${NC}"; fi
+}
+install_lighter() {
+    if [ -d "Lighter-1.1.2" ]; then log_message "${GREEN}Lighter is already installed. Skipping installation.${NC}"; else log_message "${YELLOW}Installing Lighter...${NC}"; wget -q --show-progress https://github.com/mourisl/Lighter/archive/v1.1.2.tar.gz || { log_message "${RED}Failed to download Lighter. Exiting.${NC}"; exit 1; }; tar xzvf v1.1.2.tar.gz || { log_message "${RED}Failed to extract Lighter. Exiting.${NC}"; exit 1; }; rm v1.1.2.tar.gz; cd Lighter-1.1.2 && sudo make && cd .. || { log_message "${RED}Failed to make Lighter. Exiting.${NC}"; exit 1; }; log_message "${GREEN}Lighter installed.${NC}"; fi
+}
+install_megahit() {
+    if [ -d "MEGAHIT-1.2.9-Linux-x86_64-static" ]; then log_message "${GREEN}MEGAHIT is already installed. Skipping installation.${NC}"; else log_message "${YELLOW}Installing MEGAHIT...${NC}"; wget -q --show-progress https://github.com/voutcn/megahit/releases/download/v1.2.9/MEGAHIT-1.2.9-Linux-x86_64-static.tar.gz || { log_message "${RED}Failed to download MEGAHIT. Exiting.${NC}"; exit 1; }; tar xzvf MEGAHIT-1.2.9-Linux-x86_64-static.tar.gz || { log_message "${RED}Failed to extract MEGAHIT. Exiting.${NC}"; exit 1; }; rm MEGAHIT-1.2.9-Linux-x86_64-static.tar.gz; log_message "${GREEN}MEGAHIT installed.${NC}"; fi
+}
+install_samclip() {
+    if [ -d "samclip-0.4.0" ]; then log_message "${GREEN}Samclip is already installed. Skipping installation.${NC}"; else log_message "${YELLOW}Installing Samclip...${NC}"; wget -q --show-progress https://github.com/tseemann/samclip/archive/v0.4.0.tar.gz || { log_message "${RED}Failed to download Samclip. Exiting.${NC}"; exit 1; }; tar xzvf v0.4.0.tar.gz || { log_message "${RED}Failed to extract Samclip. Exiting.${NC}"; exit 1; }; rm v0.4.0.tar.gz; log_message "${GREEN}Samclip installed.${NC}"; fi
+}
+install_skesa() {
+    if [ -d "SKESA" ]; then log_message "${GREEN}SKESA is already cloned. Skipping installation.${NC}"; else log_message "${YELLOW}Installing SKESA...${NC}"; git clone https://github.com/ncbi/SKESA || { log_message "${RED}Failed to clone SKESA. Exiting.${NC}"; exit 1; }; cd SKESA; rm -f Makefile.nongs; wget -q --show-progress https://raw.githubusercontent.com/alfred-tay/support_files/main/Makefile.nongs || { log_message "${RED}Failed to download SKESA Makefile. Exiting.${NC}"; exit 1; }; sudo make -f Makefile.nongs BOOST_PATH=/usr || { log_message "${RED}Failed to make SKESA. Exiting.${NC}"; exit 1; }; cd ..; log_message "${GREEN}SKESA installed.${NC}"; fi
+}
+install_trimmomatic() {
+    if [ -d "Trimmomatic-0.39" ]; then log_message "${GREEN}Trimmomatic is already installed. Skipping installation.${NC}"; else log_message "${YELLOW}Installing Trimmomatic...${NC}"; wget -q --show-progress http://www.usadellab.org/cms/uploads/supplementary/Trimmomatic/Trimmomatic-0.39.zip || { log_message "${RED}Failed to download Trimmomatic. Exiting.${NC}"; exit 1; }; unzip Trimmomatic-0.39.zip || { log_message "${RED}Failed to unzip Trimmomatic. Exiting.${NC}"; exit 1; }; rm Trimmomatic-0.39.zip; echo -e '#!/bin/bash\njava -jar "$HOME/Bioinformatics/Trimmomatic-0.39/trimmomatic-0.39.jar" "$@"' > "$HOME/Bioinformatics/trimmomatic"; chmod +x "$HOME/Bioinformatics/trimmomatic"; log_message "${GREEN}Trimmomatic installed.${NC}"; fi
+}
+install_bbmap() {
+    if [ -d "bbmap" ]; then log_message "${GREEN}BBMap is already installed. Skipping installation.${NC}"; else log_message "${YELLOW}Installing BBMap...${NC}"; wget -q --show-progress -O bbmap.tar.gz https://sourceforge.net/projects/bbmap/files/latest/download || { log_message "${RED}Failed to download BBMap. Exiting.${NC}"; exit 1; }; tar -xvzf bbmap.tar.gz || { log_message "${RED}Failed to extract BBMap. Exiting.${NC}"; exit 1; }; rm bbmap.tar.gz; log_message "${GREEN}BBMap installed.${NC}"; fi
+}
+
+## Update PATH
+update_path() {
+    log_message "${YELLOW}Updating PATH environment variable...${NC}"
+    local BASHRC="$HOME/.bashrc"
+    local paths=(
+        "$HOME/Bioinformatics/dfast_core"
+        "$HOME/Bioinformatics/dfast_core/bin/Linux"
+        "$HOME/Bioinformatics/dfast_core/scripts"
+        "$HOME/Bioinformatics/dfast_core/dfc"
+        "$HOME/Bioinformatics/dfast_core/dfc/tools"
+        "$HOME/Bioinformatics/dfast_core/dfc/components"
+        "$HOME/Bioinformatics/ghostx-1.3.7/src"
+        "$HOME/Bioinformatics/SPAdes-4.2.0-Linux/bin" # Updated SPAdes path here for v4.2.0
+        "$HOME/Bioinformatics/Lighter-1.1.2"
+        "$HOME/Bioinformatics/FLASH-1.2.11-Linux-x86_64"
+        "$HOME/Bioinformatics/MEGAHIT-1.2.9-Linux-x86_64-static/bin"
+        "$HOME/Bioinformatics/samclip-0.4.0"
+        "$HOME/Bioinformatics/Trimmomatic-0.39" # Directory containing the .jar for Trimmomatic
+        "$HOME/Bioinformatics/trimmomatic" # The wrapper script for Trimmomatic
+        "$HOME/Bioinformatics/shovill/bin"
+        "$HOME/Bioinformatics/SKESA"
+        "$HOME/Bioinformatics"
+        "$HOME/Bioinformatics/Scripts_dir"
+        "$HOME/Bioinformatics/bbmap"
+        "$HOME/Bioinformatics/FLASH2"
+        "$HOME/Bioinformatics/proteinortho" # Assuming proteinortho is cloned here if not using conda
+        "$HOME/miniconda3/bin" # Ensure miniconda bin is in PATH for conda base tools (this is the key for base env)
+    )
+
+    for path in "${paths[@]}"; do
+        local escaped_path=$(echo "$path" | sed 's/\//\\\//g')
+        if ! grep -q "export PATH=.*$escaped_path" "$BASHRC"; then
+            echo "export PATH=\$PATH:$path" >> "$BASHRC"
+            log_message "${GREEN}Added $path to PATH in ~/.bashrc.${NC}"
+        else
+            log_message "${YELLOW}$path is already in PATH. Skipping.${NC}"
+        fi
+    done
+
+    source "$BASHRC"
+    log_message "${GREEN}PATH updated successfully and changes applied.${NC}"
+}
+
+## Main Installation Logic
+main() {
+    install_miniconda # Installs Miniconda, ensures it's sourced.
+    setup_conda_channels # Sets up global Conda channels.
+
+    # Install non-Conda tools first
+    install_apt_pip_deps
+
+    # Specific tool installations (compile/clone)
+    install_flash2
+    install_dfast_prodigal
+    install_ghostx
+    install_shovill
+    install_spades # This will now install SPAdes v4.2.0
+    install_flash
+    install_kmc
+    install_lighter
+    install_megahit
+    install_samclip
+    install_skesa
+    install_trimmomatic
+    install_bbmap
+
+    # Conda tools installation (into the base environment)
+    install_conda_tools
+
+    update_path
+
+    log_message "${GREEN}All bioinformatics tools setup complete!${NC}"
+    log_message "${GREEN}Since you are using the base environment, you don't need to activate a specific environment.${NC}"
+    log_message "${GREEN}Please restart your terminal or run 'source ~/.bashrc' to ensure all PATH changes are active and all tools are reachable.${NC}"
+}
+
+# Execute the main function
+main
